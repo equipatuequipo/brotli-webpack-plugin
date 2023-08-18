@@ -8,7 +8,6 @@
   },
   "description": "Prepare Brotli-compressed versions of assets to serve them with Content-Encoding: br",
   "dependencies": {
-    "async": "~3.2.4",
     "webpack-sources": "^3.2.3"
   },
   "optionalDependencies": {

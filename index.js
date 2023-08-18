@@ -1,7 +1,6 @@
 // @ts-check
 const brotliCompress = require('./compress');
 const parsePath = require('path').parse;
-const async = require('async');
 
 /**
  * @typedef {import('zlib').BrotliOptions & Parameters<import('brotli')['compress']>['1']} BrotliLibsOptions
@@ -70,23 +69,22 @@ class BrotliPlugin {
 					stage: Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE_TRANSFER,
 				},
 				(assets) => {
-					async.forEach(Object.keys(assets), (filename, errorCallback) => {
-						if (this.options.test && !this.options.test.test(filename))
-							return errorCallback();
+					Object.keys(assets).forEach((filename) => {
+						if (this.options.test && !this.options.test.test(filename)) return;
 
 						const asset = compilation.getAsset(filename);
-						if (!asset) return errorCallback();
+						if (!asset) return;
 
-						let content = asset.source.buffer();
-						if (!Buffer.isBuffer(content)) return errorCallback();
+						let rawContent = asset.source.buffer();
+						if (!Buffer.isBuffer(rawContent)) return;
 
-						if (content.length < this.options.threshold) return errorCallback();
+						if (rawContent.length < this.options.threshold) return;
 
-						brotliCompress(content, this.options, (err, result) => {
-							if (err) return errorCallback(err);
+						brotliCompress(rawContent, this.options, (err, compressedResult) => {
+							if (err) return;
 
-							if (result.length / content.length > this.options.minRatio)
-								return errorCallback();
+							if (compressedResult.length / rawContent.length > this.options.minRatio)
+								return;
 
 							const parsedFilename = parsePath(filename);
 							const compressedFileName = this.options.asset.replace(
@@ -97,8 +95,10 @@ class BrotliPlugin {
 							if (this.options.deleteOriginalAssets)
 								compilation.deleteAsset(filename);
 
-							compilation.emitAsset(compressedFileName, new RawSource(result));
-							errorCallback();
+							compilation.emitAsset(
+								compressedFileName,
+								new RawSource(compressedResult)
+							);
 						});
 					});
 				}
