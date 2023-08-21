@@ -1,13 +1,16 @@
-var BrotliPlugin = require('../index.js');
-var webpack = require('webpack');
-var rmRf = require('rimraf').rimrafSync;
+// @ts-check
 
-var OUTPUT_DIR = __dirname + '/tmp/';
+const BrotliPlugin = require('../index.js').default;
+const webpack = require('webpack');
+const rmRf = require('rimraf').rimrafSync;
+const brotliDecompress = require('../compress.js').default.decompress;
+
+const OUTPUT_DIR = __dirname + '/tmp/';
 
 /** @param {webpack.Configuration} options */
-function createCompiler(options) {
+function createCompiler(options = {}) {
 	/** @type {webpack.Configuration} */
-	var defaultOptions = {
+	const defaultOptions = {
 		bail: true,
 		cache: false,
 		stats: {
@@ -35,7 +38,8 @@ function compile(compiler) {
 	return new Promise(function (resolve, reject) {
 		compiler.run(function (err, stats) {
 			if (err) return reject(err);
-			resolve(stats);
+
+			compiler.close(() => resolve(stats));
 		});
 	});
 }
@@ -49,17 +53,20 @@ describe('when applied with default settings', function () {
 		rmRf(OUTPUT_DIR);
 	});
 
-	it('compresses and decompresses', function () {
-		var compiler = createCompiler();
+	it('compresses and decompresses', async function () {
+		const compiler = createCompiler();
+		const stats = await compile(compiler);
 
-		new BrotliPlugin().apply(compiler);
+		expect(stats.compilation.assets).toHaveProperty(['main.js']);
+		expect(stats.compilation.assets).toHaveProperty(['main.js.br']);
 
-		return compile(compiler).then(function (stats) {
-			expect(stats.compilation.assets).toHaveProperty(['main.js']);
-			expect(stats.compilation.assets).toHaveProperty(['main.js.br']);
+		// FIXME: Test fails because the source is not included in the asset
+		const compressedResult = stats.compilation.getAsset('main.js.br').source.buffer();
 
-			var source = stats.compilation.assets['main.js'].source();
-			expect(source).toContain('console.log');
+		brotliDecompress(compressedResult, {}, (err, result) => {
+			const decompressedResult = result.toString();
+
+			expect(decompressedResult).toContain('Succesful result');
 		});
 	});
 });
